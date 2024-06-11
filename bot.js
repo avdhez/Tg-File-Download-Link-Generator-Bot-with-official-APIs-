@@ -6,6 +6,9 @@ require('dotenv').config();
 
 const bot = new Telegraf(process.env.BOT_TOKEN);
 
+// Set the threshold size to 2GB in bytes
+const THRESHOLD_SIZE = 2 * 1024 * 1024 * 1024; // 2GB in bytes
+
 bot.start((ctx) => ctx.reply('Welcome! Send me a file and I will provide you with a download link.'));
 
 bot.on(['document', 'video', 'audio'], async (ctx) => {
@@ -14,10 +17,9 @@ bot.on(['document', 'video', 'audio'], async (ctx) => {
     const fileSize = ctx.message.document?.file_size || ctx.message.video?.file_size || ctx.message.audio?.file_size;
 
     try {
-        if (fileSize && fileSize > 10000) { // Set your threshold value here
-            // If the file size is large, try to bypass the limit
-            const fileLink = await ctx.telegram.getFileLink(fileId);
-            ctx.reply(`Here is your download link: ${fileLink.href}`);
+        if (fileSize && fileSize > THRESHOLD_SIZE) {
+            // If the file size exceeds the threshold, send a message instead of downloading
+            ctx.reply(`The file size (${(fileSize / (1024 * 1024 * 1024)).toFixed(2)} GB) exceeds the maximum allowed size.`);
         } else {
             const fileLink = await ctx.telegram.getFileLink(fileId);
 
