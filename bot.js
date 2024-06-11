@@ -2,85 +2,35 @@ const { Telegraf } = require('telegraf');
 const fetch = require('node-fetch');
 const fs = require('fs');
 const path = require('path');
-const ffmpeg = require('fluent-ffmpeg');
-const WebTorrent = require('webtorrent');
-const client = new WebTorrent();
 require('dotenv').config();
 
-const bot = new Telegraf(process.env.BOT_TOKEN);
+const bot = new Telegraf(process.env.BOT_TOKEN); // Use the token from the environment variable
 
-const downloadFile = async (url, dest) => {
-    const res = await fetch(url);
-    const fileStream = fs.createWriteStream(dest);
-    return new Promise((resolve, reject) => {
-        res.body.pipe(fileStream);
-        res.body.on('error', reject);
-        fileStream.on('finish', resolve);
-    });
-};
+// Start command
+bot.start((ctx) => ctx.reply('Welcome! Send me a file and I will provide you with a download link.'));
 
-const downloadM3U8 = async (url, dest) => {
-    return new Promise((resolve, reject) => {
-        ffmpeg(url)
-            .on('error', reject)
-            .on('end', resolve)
-            .output(dest)
-            .run();
-    });
-};
+// Handle file uploads
+bot.on('document', async (ctx) => {
+    const fileId = ctx.message.document.file_id;
+    const fileName = ctx.message.document.file_name;
 
-bot.start((ctx) => ctx.reply('Welcome! Send me a file link, m3u8 stream, or torrent magnet link, and I will upload it to Telegram for you.'));
+    try {
+        const fileLink = await ctx.telegram.getFileLink(fileId);
+        
+        // Fetch the file
+        const response = await fetch(fileLink.href);
 
-// Handle direct file links, m3u8 streams, and torrent magnet links
-bot.on('text', async (ctx) => {
-    const messageText = ctx.message.text;
-    const tmpDir = './tmp';
-    if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir);
+        // Save the file locally
+        const filePath = path.join(__dirname, 'uploads', fileName); // Assuming 'uploads' directory exists
+        const fileStream = fs.createWriteStream(filePath);
+        response.body.pipe(fileStream);
 
-    const isM3U8 = messageText.endsWith('.m3u8');
-    const isTorrent = messageText.startsWith('magnet:');
-    const isDirectLink = messageText.startsWith('http');
-
-    if (isM3U8) {
-        const fileName = path.join(tmpDir, `${Date.now()}.mp4`);
-        try {
-            await downloadM3U8(messageText, fileName);
-            await ctx.replyWithDocument({ source: fileName });
-            fs.unlinkSync(fileName);
-        } catch (error) {
-            console.error(error);
-            ctx.reply('Failed to download m3u8 stream.');
-        }
-    } else if (isTorrent) {
-        client.add(messageText, torrent => {
-            torrent.files.forEach(file => {
-                const filePath = path.join(tmpDir, file.name);
-                const stream = file.createReadStream();
-                const writeStream = fs.createWriteStream(filePath);
-                stream.pipe(writeStream);
-                writeStream.on('finish', async () => {
-                    try {
-                        await ctx.replyWithDocument({ source: filePath });
-                        fs.unlinkSync(filePath);
-                    } catch (error) {
-                        console.error(error);
-                        ctx.reply('Failed to upload torrent file.');
-                    }
-                });
-            });
-        });
-    } else if (isDirectLink) {
-        const fileName = path.join(tmpDir, path.basename(messageText));
-        try {
-            await downloadFile(messageText, fileName);
-            await ctx.replyWithDocument({ source: fileName });
-            fs.unlinkSync(fileName);
-        } catch (error) {
-            console.error(error);
-            ctx.reply('Failed to download file.');
-        }
-    } else {
-        ctx.reply('Please send a valid file link, m3u8 stream, or torrent magnet link.');
+        // Send the download link
+        const downloadLink = `http://your-server-url/${fileName}`; // Modify this URL accordingly
+        ctx.reply(`Here is your download link: ${downloadLink}`);
+    } catch (error) {
+        console.error(error);
+        ctx.reply('Sorry, something went wrong. Please try again.');
     }
 });
 
