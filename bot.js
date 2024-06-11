@@ -1,47 +1,86 @@
 const { Telegraf } = require('telegraf');
+const fetch = require('node-fetch');
+const fs = require('fs');
+const path = require('path');
+const ffmpeg = require('fluent-ffmpeg');
+const WebTorrent = require('webtorrent');
+const client = new WebTorrent();
 require('dotenv').config();
 
-const bot = new Telegraf(process.env.BOT_TOKEN); // Use the token from the environment variable
+const bot = new Telegraf(process.env.BOT_TOKEN);
 
-// Start command
-bot.start((ctx) => ctx.reply('Welcome! Send me a file (up to 50 MB) and I will provide you with a download link. For files larger than 50 MB, please upload them to a cloud storage service like Google Drive or Dropbox and share the link here.'));
+const downloadFile = async (url, dest) => {
+    const res = await fetch(url);
+    const fileStream = fs.createWriteStream(dest);
+    return new Promise((resolve, reject) => {
+        res.body.pipe(fileStream);
+        res.body.on('error', reject);
+        fileStream.on('finish', resolve);
+    });
+};
 
-// Handle file uploads
-bot.on('document', async (ctx) => {
-    const fileId = ctx.message.document.file_id;
-    const fileName = ctx.message.document.file_name;
-    const fileSize = ctx.message.document.file_size;
-    const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB in bytes
+const downloadM3U8 = async (url, dest) => {
+    return new Promise((resolve, reject) => {
+        ffmpeg(url)
+            .on('error', reject)
+            .on('end', resolve)
+            .output(dest)
+            .run();
+    });
+};
 
-    if (fileSize > MAX_FILE_SIZE) {
-        return ctx.reply('The file is too big to download directly. Please upload it to a cloud storage service (e.g., Google Drive, Dropbox) and share the link here.');
-    }
+bot.start((ctx) => ctx.reply('Welcome! Send me a file link, m3u8 stream, or torrent magnet link, and I will upload it to Telegram for you.'));
 
-    try {
-        const fileLink = await ctx.telegram.getFileLink(fileId);
-        
-        // Send the download link
-        ctx.reply(`Here is your download link: ${fileLink.href}`);
-    } catch (error) {
-        console.error(error);
-        ctx.reply('Sorry, something went wrong. Please try again.');
-    }
-});
-
-// Handle messages containing cloud storage links
-bot.on('text', (ctx) => {
+// Handle direct file links, m3u8 streams, and torrent magnet links
+bot.on('text', async (ctx) => {
     const messageText = ctx.message.text;
-    
-    // Regex patterns to match Google Drive and Dropbox links
-    const googleDrivePattern = /https:\/\/drive\.google\.com\/file\/d\/[^\/]+\/view/;
-    const dropboxPattern = /https:\/\/www\.dropbox\.com\/s\/[^\/]+\/[^\/]+\?dl=0/;
+    const tmpDir = './tmp';
+    if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir);
 
-    if (googleDrivePattern.test(messageText)) {
-        ctx.reply('Thank you for sharing the Google Drive link. Here is your file link: ' + messageText);
-    } else if (dropboxPattern.test(messageText)) {
-        ctx.reply('Thank you for sharing the Dropbox link. Here is your file link: ' + messageText);
+    const isM3U8 = messageText.endsWith('.m3u8');
+    const isTorrent = messageText.startsWith('magnet:');
+    const isDirectLink = messageText.startsWith('http');
+
+    if (isM3U8) {
+        const fileName = path.join(tmpDir, `${Date.now()}.mp4`);
+        try {
+            await downloadM3U8(messageText, fileName);
+            await ctx.replyWithDocument({ source: fileName });
+            fs.unlinkSync(fileName);
+        } catch (error) {
+            console.error(error);
+            ctx.reply('Failed to download m3u8 stream.');
+        }
+    } else if (isTorrent) {
+        client.add(messageText, torrent => {
+            torrent.files.forEach(file => {
+                const filePath = path.join(tmpDir, file.name);
+                const stream = file.createReadStream();
+                const writeStream = fs.createWriteStream(filePath);
+                stream.pipe(writeStream);
+                writeStream.on('finish', async () => {
+                    try {
+                        await ctx.replyWithDocument({ source: filePath });
+                        fs.unlinkSync(filePath);
+                    } catch (error) {
+                        console.error(error);
+                        ctx.reply('Failed to upload torrent file.');
+                    }
+                });
+            });
+        });
+    } else if (isDirectLink) {
+        const fileName = path.join(tmpDir, path.basename(messageText));
+        try {
+            await downloadFile(messageText, fileName);
+            await ctx.replyWithDocument({ source: fileName });
+            fs.unlinkSync(fileName);
+        } catch (error) {
+            console.error(error);
+            ctx.reply('Failed to download file.');
+        }
     } else {
-        ctx.reply('If you are sharing a file link, please make sure it is a valid Google Drive or Dropbox link.');
+        ctx.reply('Please send a valid file link, m3u8 stream, or torrent magnet link.');
     }
 });
 
