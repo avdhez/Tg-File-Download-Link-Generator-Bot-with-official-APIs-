@@ -14,7 +14,7 @@ bot.on(['document', 'video', 'audio'], async (ctx) => {
     const fileSize = ctx.message.document?.file_size || ctx.message.video?.file_size || ctx.message.audio?.file_size;
 
     try {
-        if (fileSize && fileSize > YOUR_THRESHOLD) { // Set your threshold value here
+        if (fileSize && fileSize > 10000) { // Set your threshold value here
             // If the file size is large, try to bypass the limit
             const fileLink = await ctx.telegram.getFileLink(fileId);
             ctx.reply(`Here is your download link: ${fileLink.href}`);
