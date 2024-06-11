@@ -1,18 +1,13 @@
 {
-  "name": "telegram-bot",
+  "name": "your_bot_name",
   "version": "1.0.0",
-  "description": "Telegram bot to upload files, m3u8 streams, and torrent magnet links.",
+  "description": "Your bot description",
   "main": "bot.js",
   "scripts": {
-    "start": "node bot.js"
+    "start": "bot.js"
   },
-  "author": "Your Name",
-  "license": "MIT",
   "dependencies": {
-    "telegraf": "^4.7.8",
-    "node-fetch": "^3.0.0",
-    "fluent-ffmpeg": "^2.1.2",
-    "webtorrent": "^0.107.8",
-    "dotenv": "^10.0.0"
+    "telegraf": "^4.8.2",
+    "node-fetch": "^3.0.0"
   }
 }
