@@ -8,19 +8,16 @@ const bot = new Telegraf(process.env.BOT_TOKEN);
 
 bot.start((ctx) => ctx.reply('Welcome! Send me a file and I will provide you with a download link.'));
 
-bot.on('document', async (ctx) => {
-    const fileId = ctx.message.document.file_id;
-    const fileName = ctx.message.document.file_name;
-    const fileSize = ctx.message.document.file_size;
+bot.on(['document', 'video', 'audio'], async (ctx) => {
+    const fileId = ctx.message.document?.file_id || ctx.message.video?.file_id || ctx.message.audio?.file_id;
+    const fileName = ctx.message.document?.file_name || ctx.message.video?.file_name || ctx.message.audio?.file_name;
+    const fileSize = ctx.message.document?.file_size || ctx.message.video?.file_size || ctx.message.audio?.file_size;
 
     try {
-        if (fileSize > YOUR_THRESHOLD) { // Set your threshold value here
-            // If the file size is large, send JSON message with file details
-            ctx.reply(JSON.stringify({
-                fileName: fileName,
-                fileSize: fileSize,
-                fileId: fileId
-            }));
+        if (fileSize && fileSize > YOUR_THRESHOLD) { // Set your threshold value here
+            // If the file size is large, try to bypass the limit
+            const fileLink = await ctx.telegram.getFileLink(fileId);
+            ctx.reply(`Here is your download link: ${fileLink.href}`);
         } else {
             const fileLink = await ctx.telegram.getFileLink(fileId);
 
