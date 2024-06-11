@@ -1,0 +1,18 @@
+version: '3'
+services:
+  bot:
+    build: .
+    environment:
+      - BOT_TOKEN=your_bot_token
+      - DATABASE_URL=postgres://your_postgres_connection_string
+      - SERVER_URL=http://your-server-url
+    volumes:
+      - ./uploads:/usr/src/app/uploads
+    depends_on:
+      - postgres
+  postgres:
+    image: postgres:latest
+    environment:
+      - POSTGRES_USER=your_postgres_user
+      - POSTGRES_PASSWORD=your_postgres_password
+      - POSTGRES_DB=your_postgres_db_name
