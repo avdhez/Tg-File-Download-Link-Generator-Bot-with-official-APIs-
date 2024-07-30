@@ -41,3 +41,5 @@ bot.on(['document', 'video', 'audio'], async (ctx) => {
 bot.launch();
 
 console.log('Bot is running...');
+
+##jisne code copy kiya uska chin tabaq dum dum 
