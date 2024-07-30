@@ -42,4 +42,4 @@ bot.launch();
 
 console.log('Bot is running...');
 
-##jisne code copy kiya uska chin tabaq dum dum 
+//jisne code copy kiya uska chin tabaq dum dum 
